@@ -142,10 +142,12 @@ contract NftStaking is
     function isRewardWithdrawable(address _user, address _nftPool) external view returns (bool isWithdrawable) {
         UserInfo memory _userData = _userInfo[_nftPool][_user];
         if (_userData.withdrawAt == 0) revert NFTNotWithdrawnYet();
-        if (block.number <= _userData.withdrawAt + _poolInfo[_nftPool].claimRewardBuffer) {
+
+        if (block.number < _userData.withdrawAt + _poolInfo[_nftPool].claimRewardBuffer) {
             isWithdrawable = false;
+        } else {
+            isWithdrawable = true;
         }
-        isWithdrawable = true;
     }
 
     function _calculateRewardAccumulated(uint256 _depositedAt, uint256 _perBlockReward)
