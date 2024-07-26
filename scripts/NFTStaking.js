@@ -34,27 +34,6 @@ async function deployNFTStaking() {
 
   console.log(`\nNFTStaking contract is deployed at : ${proxyAddress}\n`);
   console.log(`Implementation contract address: ${implementationAddress}\n`);
-
-  writeDeploymentAddressesToFile(proxyAddress, implementationAddress);
-}
-
-function writeDeploymentAddressesToFile(proxyAddress, implementationAddress) {
-  const data = {
-    NFTStakingProxy: proxyAddress,
-    NFTStakingImplementation: implementationAddress,
-  };
-
-  fs.writeFile(
-    "deploymentAddresses.json",
-    JSON.stringify(data, null, 2),
-    (err) => {
-      if (err) {
-        console.error("Error writing to file", err);
-      } else {
-        console.log("Deployment addresses saved to deploymentAddresses.json");
-      }
-    }
-  );
 }
 
 deployNFTStaking()

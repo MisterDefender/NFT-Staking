@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
+  "scripts": {
+    "build": "npx hardhat compile",
+    "deploy-arbSepolia": "npx hardhat run scripts/NFTStaking.js --network arbSepolia",
+    "test": "npx hardhat test",
+    "coverage": "npx hardhat coverage"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-ethers": "^3.0.0",
