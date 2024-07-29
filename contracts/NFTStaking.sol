@@ -87,6 +87,7 @@ contract NftStaking is
         address withdrawer = msg.sender;
 
         UserInfo memory _user = _userInfo[_pool][withdrawer];
+        if (_user.tokenId == 0) revert UserAlreadyExists();
         if (_user.withdrawRequestedAt != 0) revert WithdrawalAlreadyRequested();
 
         _user.rewardDebt = _calculateRewardAccumulated(_user.depositedAt, _poolInfo[_pool].rewardPerBlock);
