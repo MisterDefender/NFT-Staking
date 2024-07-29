@@ -36,6 +36,7 @@ interface INftStaking {
     error ClaimBufferNotElapsed();
     error ZeroRewardToWithdraw();
     error InvalidRewardAmount();
+    error DepositNotFound();
 
     function initialize(address _admin, address _REWARDTOKEN) external;
     function addPool(

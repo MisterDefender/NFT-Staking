@@ -190,10 +190,10 @@ describe("NftStaking", function () {
     beforeEach(async function () {
       await setupStakingConfig();
       await NFT1.connect(Alice).approve(NFTStaking.target, 1);
-      await NFTStaking.connect(Alice).deposit(NFT1.target, 1);
     });
 
     it("Should request withdrawal successfully", async function () {
+      await NFTStaking.connect(Alice).deposit(NFT1.target, 1);
       const tx = await NFTStaking.connect(Alice).requestWithdraw(NFT1.target);
       await expect(tx)
         .to.emit(NFTStaking, "WithdrawRequested")
@@ -204,16 +204,24 @@ describe("NftStaking", function () {
     });
 
     it("Should fail to request withdrawal if pool doesn't exist", async function () {
+      await NFTStaking.connect(Alice).deposit(NFT1.target, 1);
       await expect(
         NFTStaking.connect(Alice).requestWithdraw(ethers.ZeroAddress)
       ).to.be.revertedWithCustomError(NFTStaking, "PoolDoesNotExist");
     });
 
     it("Should fail to request withdrawal if already requested", async function () {
+      await NFTStaking.connect(Alice).deposit(NFT1.target, 1);
       await NFTStaking.connect(Alice).requestWithdraw(NFT1.target);
       await expect(
         NFTStaking.connect(Alice).requestWithdraw(NFT1.target)
       ).to.be.revertedWithCustomError(NFTStaking, "WithdrawalAlreadyRequested");
+    });
+
+    it("Should fail to request withdrawal if deposit is not made", async function () {
+      await expect(
+        NFTStaking.connect(Alice).requestWithdraw(NFT1.target)
+      ).to.be.revertedWithCustomError(NFTStaking, "DepositNotFound");
     });
   });
 
@@ -315,6 +323,49 @@ describe("NftStaking", function () {
       await expect(
         NFTStaking.connect(Alice).claimRewards(NFT1.target, Alice.address)
       ).to.be.revertedWithCustomError(NFTStaking, "NFTNotWithdrawnYet");
+    });
+  });
+
+  describe("Claim reward with correct APR", function () {
+    let depositedAt;
+    let withdrawRequestedAt;
+    let rewardBlocks;
+
+    beforeEach(async function () {
+      await setupStakingConfig();
+      await NFT1.connect(Alice).approve(NFTStaking.target, 1);
+      let tx = await NFTStaking.connect(Alice).deposit(NFT1.target, 1);
+      depositedAt = tx.blockNumber;
+    });
+
+    it("should claim reward with correct APR even if the reward per block is updated", async function () {
+      let rewardPerBlockBeforeUpdate = (await NFTStaking.poolInfo(NFT1.target))
+        .rewardPerBlock;
+      expect(rewardPerBlockBeforeUpdate).to.be.equal(100);
+
+      await NFTStaking.connect(owner).updateRewardPerBlock(NFT1.target, 150);
+      const rewardPerBlockAfterUpdate = (await NFTStaking.poolInfo(NFT1.target))
+        .rewardPerBlock;
+      expect(rewardPerBlockAfterUpdate).to.equal(150);
+
+      await mineBlocks(100);
+
+      let tx1 = await NFTStaking.connect(Alice).requestWithdraw(NFT1.target);
+      withdrawRequestedAt = tx1.blockNumber;
+      rewardBlocks = withdrawRequestedAt - depositedAt;
+      await mineBlocks(10); // Unbonding period
+      await NFTStaking.connect(Alice).withdraw(NFT1.target);
+
+      await mineBlocks(50); // Claim buffer
+      const tx = await NFTStaking.connect(Alice).claimRewards(
+        NFT1.target,
+        Alice.address
+      );
+      let rewardAmount = BigInt(rewardBlocks) * rewardPerBlockBeforeUpdate; // 100 reward per block
+      await expect(tx)
+        .to.emit(NFTStaking, "Claimed")
+        .withArgs(NFT1.target, Alice.address, Alice.address, rewardAmount);
+      expect(await rewardToken.balanceOf(Alice.address)).to.equal(rewardAmount);
     });
   });
 
