@@ -8,6 +8,7 @@ interface INftStaking {
         uint256 depositedAt;
         uint256 withdrawRequestedAt;
         uint256 withdrawAt;
+        uint256 rewardPerBlock;
     }
 
     struct NFTPoolInfo {

@@ -75,6 +75,7 @@ contract NftStaking is
 
         _user.tokenId = _tokenId;
         _user.depositedAt = block.number;
+        _user.rewardPerBlock = _poolInfo[_pool].rewardPerBlock;
         _userInfo[_pool][depositor] = _user;
 
         IERC721(_pool).safeTransferFrom(depositor, address(this), _tokenId);
@@ -90,7 +91,7 @@ contract NftStaking is
         if (_user.tokenId == 0) revert UserAlreadyExists();
         if (_user.withdrawRequestedAt != 0) revert WithdrawalAlreadyRequested();
 
-        _user.rewardDebt = _calculateRewardAccumulated(_user.depositedAt, _poolInfo[_pool].rewardPerBlock);
+        _user.rewardDebt = _calculateRewardAccumulated(_user.depositedAt, _user.rewardPerBlock);
         _user.withdrawRequestedAt = block.number;
         _userInfo[_pool][withdrawer] = _user;
 
