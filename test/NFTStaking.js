@@ -266,7 +266,7 @@ describe("NftStaking", function () {
 
   describe("Claim Rewards", function () {
     let depositedAt;
-    let withdrawRequestedAt;
+    let withdrawAt;
     let rewardBlocks;
     beforeEach(async function () {
       await setupStakingConfig();
@@ -274,11 +274,11 @@ describe("NftStaking", function () {
       let tx = await NFTStaking.connect(Alice).deposit(NFT1.target, 1);
       depositedAt = tx.blockNumber;
       await mineBlocks(100);
-      let tx1 = await NFTStaking.connect(Alice).requestWithdraw(NFT1.target);
-      withdrawRequestedAt = tx1.blockNumber;
-      rewardBlocks = withdrawRequestedAt - depositedAt;
+      await NFTStaking.connect(Alice).requestWithdraw(NFT1.target);
       await mineBlocks(10); // Unbonding period
-      await NFTStaking.connect(Alice).withdraw(NFT1.target);
+      let tx1 = await NFTStaking.connect(Alice).withdraw(NFT1.target);
+      withdrawAt = tx1.blockNumber;
+      rewardBlocks = withdrawAt - depositedAt;
     });
 
     it("Should claim rewards successfully after claim buffer", async function () {
@@ -328,7 +328,7 @@ describe("NftStaking", function () {
 
   describe("Claim reward with correct APR", function () {
     let depositedAt;
-    let withdrawRequestedAt;
+    let withdrawAt;
     let rewardBlocks;
 
     beforeEach(async function () {
@@ -338,7 +338,7 @@ describe("NftStaking", function () {
       depositedAt = tx.blockNumber;
     });
 
-    it("should claim reward with correct APR even if the reward per block is updated", async function () {
+    it.only("should claim reward with correct APR even if the reward per block is updated", async function () {
       let rewardPerBlockBeforeUpdate = (await NFTStaking.poolInfo(NFT1.target))
         .rewardPerBlock;
       expect(rewardPerBlockBeforeUpdate).to.be.equal(100);
@@ -350,11 +350,11 @@ describe("NftStaking", function () {
 
       await mineBlocks(100);
 
-      let tx1 = await NFTStaking.connect(Alice).requestWithdraw(NFT1.target);
-      withdrawRequestedAt = tx1.blockNumber;
-      rewardBlocks = withdrawRequestedAt - depositedAt;
+      await NFTStaking.connect(Alice).requestWithdraw(NFT1.target);
       await mineBlocks(10); // Unbonding period
-      await NFTStaking.connect(Alice).withdraw(NFT1.target);
+      let tx1 = await NFTStaking.connect(Alice).withdraw(NFT1.target);
+      withdrawAt = tx1.blockNumber;
+      rewardBlocks = withdrawAt - depositedAt;
 
       await mineBlocks(50); // Claim buffer
       const tx = await NFTStaking.connect(Alice).claimRewards(

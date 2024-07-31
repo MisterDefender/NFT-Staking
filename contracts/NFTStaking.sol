@@ -91,7 +91,6 @@ contract NftStaking is
         if (_user.tokenId == 0) revert DepositNotFound();
         if (_user.withdrawRequestedAt != 0) revert WithdrawalAlreadyRequested();
 
-        _user.rewardDebt = _calculateRewardAccumulated(_user.depositedAt, _user.rewardPerBlock);
         _user.withdrawRequestedAt = block.number;
         _userInfo[_pool][withdrawer] = _user;
 
@@ -107,6 +106,7 @@ contract NftStaking is
         if (block.number < (_user.withdrawRequestedAt + _poolInfo[_pool].unbondingPeriod)) {
             revert UnbondingPeriodNotElapsed();
         }
+        _user.rewardDebt = _calculateRewardAccumulated(_user.depositedAt, _user.rewardPerBlock);
 
         uint256 _tokenId = _user.tokenId;
         _user.tokenId = 0;
@@ -125,8 +125,7 @@ contract NftStaking is
 
         address rewardClaimer = msg.sender;
         UserInfo memory _user = _userInfo[_pool][rewardClaimer];
-        if (_user.withdrawAt == 0) revert NFTNotWithdrawnYet();
-        if (block.number <= _user.withdrawAt + _poolInfo[_pool].claimRewardBuffer) {
+        if (!isRewardWithdrawable(rewardClaimer, _pool)) {
             revert ClaimBufferNotElapsed();
         }
         uint256 reward = _user.rewardDebt;
@@ -141,7 +140,7 @@ contract NftStaking is
         emit Claimed(_pool, rewardClaimer, _to, reward);
     }
 
-    function isRewardWithdrawable(address _user, address _nftPool) external view returns (bool isWithdrawable) {
+    function isRewardWithdrawable(address _user, address _nftPool) public view returns (bool isWithdrawable) {
         UserInfo memory _userData = _userInfo[_nftPool][_user];
         if (_userData.withdrawAt == 0) revert NFTNotWithdrawnYet();
 
