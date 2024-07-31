@@ -122,7 +122,9 @@ yarn run deploy-arbSepolia
 ## 🌐 Current Deployment on Arbitrum-Sepolia
 
 **NFTStaking contract** (UUPS Proxy Pattern): [0xe841B5F4167a0E953d1351E6A513158320439469](https://sepolia.arbiscan.io/address/0xe841B5F4167a0E953d1351E6A513158320439469#code)
-**Implementation contract**: [0x2D604128F510F2E39B6e7B04e3AD3923f947cEdA](https://sepolia.arbiscan.io/address/0x2D604128F510F2E39B6e7B04e3AD3923f947cEdA#code)
+**Implementation contract [Old Implementation]**: [0x2D604128F510F2E39B6e7B04e3AD3923f947cEdA](https://sepolia.arbiscan.io/address/0x2D604128F510F2E39B6e7B04e3AD3923f947cEdA#code)
+
+**NFTStaking contract upgraded to new implementation**: [0x7F9BD0BE298Ce389E1449Dc172A53d20d9103DF2](https://sepolia.arbiscan.io/address/0x7f9bd0be298ce389e1449dc172a53d20d9103df2#code)
 
 **Reward Token**: [0x8fD2D8E15BE120C161533E3466Afe654758214d3](https://sepolia.arbiscan.io/address/0x8fD2D8E15BE120C161533E3466Afe654758214d3#code)
 
