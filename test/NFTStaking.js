@@ -44,6 +44,23 @@ async function setupStakingConfig() {
     claimBufferBN
   );
 }
+async function setupCustomStakingConfig() {
+  const pools = [NFT1.target, NFT2.target, NFT3.target, NFT4.target];
+  const rewardPerBlock = [100, 100, 100, 100];
+  const bondingPeriodBN = [10, 20, 30, 40];
+  const claimBufferBN = [50, 100, 150, 200];
+
+  await rewardToken
+    .connect(owner)
+    .transfer(NFTStaking.target, ethers.parseEther("10000"));
+
+  await NFTStaking.connect(owner).addPool(
+    pools,
+    rewardPerBlock,
+    bondingPeriodBN,
+    claimBufferBN
+  );
+}
 
 async function mineBlocks(numberOfBlocks) {
   await helpers.mine(numberOfBlocks);
@@ -53,6 +70,7 @@ async function mintNFTs() {
   await NFT1.connect(Alice).safeMint(Alice.address, 1);
   await NFT2.connect(Bob).safeMint(Bob.address, 2);
   await NFT3.connect(Joy).safeMint(Joy.address, 3);
+  await NFT4.connect(Alice).safeMint(Alice.address, 4);
 }
 
 describe("NftStaking", function () {
@@ -338,7 +356,7 @@ describe("NftStaking", function () {
       depositedAt = tx.blockNumber;
     });
 
-    it.only("should claim reward with correct APR even if the reward per block is updated", async function () {
+    it("should claim reward with correct APR even if the reward per block is updated", async function () {
       let rewardPerBlockBeforeUpdate = (await NFTStaking.poolInfo(NFT1.target))
         .rewardPerBlock;
       expect(rewardPerBlockBeforeUpdate).to.be.equal(100);
@@ -442,6 +460,215 @@ describe("NftStaking", function () {
       // Check isRewardWithdrawable after claim buffer
       expect(await NFTStaking.isRewardWithdrawable(Alice.address, NFT1.target))
         .to.be.true;
+    });
+  });
+});
+
+describe("Custom NFTStaking test", function () {
+  beforeEach("deploy the contracts", async () => {
+    await setup();
+    await mintNFTs();
+  });
+
+  describe("custom test", function () {
+    beforeEach("setup for withdraw", async () => {
+      await setupCustomStakingConfig();
+      await NFT1.connect(Alice).approve(NFTStaking.target, 1);
+      await NFT2.connect(Bob).approve(NFTStaking.target, 2);
+      await NFT3.connect(Joy).approve(NFTStaking.target, 3);
+      await NFT4.connect(Alice).approve(NFTStaking.target, 4);
+    });
+    it("Should check the rewards of users for custom logic", async function () {
+      const poolInfo = await NFTStaking.poolInfo(NFT1.target);
+      expect(poolInfo.exist).to.be.true;
+      expect(poolInfo.rewardPerBlock).to.equal(100);
+      expect(poolInfo.unbondingPeriod).to.equal(10);
+      expect(poolInfo.claimRewardBuffer).to.equal(50);
+
+      // ALice deposits initially with RPB = 100
+      let totalBlockelapsed = 0;
+      let RPBWhenAliceFirstDeposits = poolInfo.rewardPerBlock;
+
+      let tx_0 = await NFTStaking.connect(Alice).deposit(NFT1.target, 1);
+      const AliceFirstDepositBN = tx_0.blockNumber; // consider this as day-0
+      console.log("Alice first deposits BN: ", AliceFirstDepositBN);
+      let AliceFirstDepositElapsedBN;
+      let AliceSecondDepositElapsedBN;
+      let extraBN = 0; // Due to 2 times reward updates
+      await mineBlocks(29); // so that new txn is added in 30th block
+
+      // USER-B deposits
+      let RPBWhenBobDeposit = poolInfo.rewardPerBlock;
+      let tx_1 = await NFTStaking.connect(Bob).deposit(NFT2.target, 2);
+      const bobDepositBN = tx_1.blockNumber;
+      console.log("bob deposited at: ", bobDepositBN);
+      console.log(
+        "difference b/w Alice and bob deposits BN",
+        bobDepositBN - AliceFirstDepositBN
+      );
+      let totalBeforeFirstRewardUpdate = bobDepositBN - AliceFirstDepositBN;
+      totalBlockelapsed += totalBeforeFirstRewardUpdate;
+
+      // Update the reward per block of all NFT first time
+      await mineBlocks(29); // so that new txn is added in 61th block
+      const NFT = [NFT1.target, NFT2.target, NFT3.target, NFT4.target];
+      const newRPB1 = [600, 600, 600, 600];
+      let txn = await NFTStaking.connect(owner).batchUpdateRewardPerBlock(
+        NFT,
+        newRPB1
+      );
+      let firstRewardUpdatedBN = txn.blockNumber;
+      console.log("First reward BN: ", firstRewardUpdatedBN);
+      totalBlockelapsed += firstRewardUpdatedBN - bobDepositBN;
+      expect(firstRewardUpdatedBN - bobDepositBN).to.be.equal(30); // 30days
+      console.log(
+        "Total block elapsed till RPB is updated for first time: ",
+        totalBlockelapsed
+      );
+
+      //Assertions
+      const poolInfo1 = await NFTStaking.poolInfo(NFT1.target);
+      const poolInfo2 = await NFTStaking.poolInfo(NFT2.target);
+      const poolInfo3 = await NFTStaking.poolInfo(NFT3.target);
+      const poolInfo4 = await NFTStaking.poolInfo(NFT4.target);
+      expect(poolInfo1.rewardPerBlock).to.equal(600);
+      expect(poolInfo2.rewardPerBlock).to.equal(600);
+      expect(poolInfo3.rewardPerBlock).to.equal(600);
+      expect(poolInfo4.rewardPerBlock).to.equal(600);
+
+      let RPBWhenJoyDeposit = poolInfo3.rewardPerBlock;
+
+      let tx_2 = await NFTStaking.connect(Joy).deposit(NFT3.target, 3);
+      const joyDepositBN = tx_2.blockNumber;
+      console.log("Joy deposited at: ", joyDepositBN);
+      totalBlockelapsed += joyDepositBN - firstRewardUpdatedBN;
+      extraBN += joyDepositBN - firstRewardUpdatedBN;
+      console.log(
+        "Total block elapsed till RPB is 600 and User C deposit: ",
+        totalBlockelapsed
+      );
+      console.log("minable blocks: ", 180 - totalBlockelapsed);
+      let minableBlocks = 180 - totalBlockelapsed;
+      await mineBlocks(minableBlocks); // to reach to 181 days for reward update txn
+
+      const newRPB2 = [1200, 1200, 1200, 1200];
+      let txn1 = await NFTStaking.connect(owner).batchUpdateRewardPerBlock(
+        NFT,
+        newRPB2
+      );
+      let secondRewardUpdatedBN = txn1.blockNumber;
+      console.log("Second reward BN: ", secondRewardUpdatedBN);
+      totalBlockelapsed += minableBlocks;
+      expect(totalBlockelapsed).to.be.equal(180); // 180 days
+      console.log(
+        "Total block elapsed till RPB is updated for second time: ",
+        totalBlockelapsed
+      );
+
+      //Assertions
+      const poolInfo1Re = await NFTStaking.poolInfo(NFT1.target);
+      const poolInfo2Re = await NFTStaking.poolInfo(NFT2.target);
+      const poolInfo3Re = await NFTStaking.poolInfo(NFT3.target);
+      const poolInfo4Re = await NFTStaking.poolInfo(NFT4.target);
+      expect(poolInfo1Re.rewardPerBlock).to.equal(1200);
+      expect(poolInfo2Re.rewardPerBlock).to.equal(1200);
+      expect(poolInfo3Re.rewardPerBlock).to.equal(1200);
+      expect(poolInfo4Re.rewardPerBlock).to.equal(1200);
+
+      let RPBWhenAliceSecondDeposits = poolInfo4Re.rewardPerBlock;
+
+      let tx_3 = await NFTStaking.connect(Alice).deposit(NFT4.target, 4);
+      const aliceReDepositBN = tx_3.blockNumber;
+      console.log("Alice Re deposited another NFT at: ", aliceReDepositBN);
+      extraBN += aliceReDepositBN - secondRewardUpdatedBN;
+      let minableBlocksAgain = 360 - totalBlockelapsed;
+      await mineBlocks(minableBlocksAgain); // to reach to 361 days for reward update txn
+      let blockNumberAtLastDay = await ethers.provider.getBlockNumber();
+
+      totalBlockelapsed += minableBlocksAgain;
+      expect(totalBlockelapsed).to.be.equal(360); // 360 days
+      console.log(
+        "Total block elapsed till 360 days RPB is updated for second time: ",
+        totalBlockelapsed
+      );
+      console.log(
+        "Extra block lapesed due to 2 times reward updates: ",
+        extraBN
+      );
+
+      console.log("blockNumberAtLastDay: ", blockNumberAtLastDay);
+      AliceFirstDepositElapsedBN = blockNumberAtLastDay - AliceFirstDepositBN;
+      AliceSecondDepositElapsedBN = blockNumberAtLastDay - aliceReDepositBN;
+      let BobDepositElapsedBN = blockNumberAtLastDay - bobDepositBN;
+      let JoyDepositElapsedBN = blockNumberAtLastDay - joyDepositBN;
+
+      let aliceExpectedRewardForFirstDeposit =
+        BigInt(AliceFirstDepositElapsedBN) * RPBWhenAliceFirstDeposits;
+      let aliceExpectedRewardForSecondDeposit =
+        BigInt(AliceSecondDepositElapsedBN) * RPBWhenAliceSecondDeposits;
+      let bobExpectedReward = BigInt(BobDepositElapsedBN) * RPBWhenBobDeposit;
+      let joyExpectedReward = BigInt(JoyDepositElapsedBN) * RPBWhenJoyDeposit;
+
+      let AliceReward1 = await NFTStaking.getAccumulatedReward(
+        Alice.address,
+        NFT1.target
+      );
+      let AliceReward2 = await NFTStaking.getAccumulatedReward(
+        Alice.address,
+        NFT4.target
+      );
+      let BobReward = await NFTStaking.getAccumulatedReward(
+        Bob.address,
+        NFT2.target
+      );
+      let JoyReward = await NFTStaking.getAccumulatedReward(
+        Joy.address,
+        NFT3.target
+      );
+      const expectedTotalAliceReward =
+        aliceExpectedRewardForFirstDeposit +
+        aliceExpectedRewardForSecondDeposit;
+      const totalAliceReward = AliceReward1 + AliceReward2;
+      expect(expectedTotalAliceReward).to.be.equal(totalAliceReward);
+      expect(bobExpectedReward).to.be.equal(BobReward);
+      expect(joyExpectedReward).to.be.equal(JoyReward);
+
+      console.log(
+        "Alice (User-A) expected reward for first deposit: ",
+        aliceExpectedRewardForFirstDeposit.toString()
+      );
+      console.log(
+        "Alice (User-A) expected reward for second deposit: ",
+        aliceExpectedRewardForSecondDeposit.toString()
+      );
+      console.log(
+        "Alice (User-A) actual reward for first deposit :",
+        AliceReward1.toString()
+      );
+      console.log(
+        "Alice (User-A) actual reward for second deposit :",
+        AliceReward2.toString()
+      );
+      console.log(
+        "Alice (User-A) total reward accumulated :",
+        totalAliceReward.toString()
+      );
+      console.log(
+        "Bob (user-B) expected reward for deposit :",
+        bobExpectedReward.toString()
+      );
+      console.log(
+        "Bob (user-B) actual reward for deposit :",
+        BobReward.toString()
+      );
+      console.log(
+        "Joy (user-C) expected reward for deposit :",
+        joyExpectedReward.toString()
+      );
+      console.log(
+        "Joy (user-C) actual reward for deposit :",
+        JoyReward.toString()
+      );
     });
   });
 });
