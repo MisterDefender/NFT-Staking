@@ -55,4 +55,6 @@ interface INftStaking {
 
     function poolInfo(address nft) external view returns (NFTPoolInfo memory);
     function userInfo(address pool, address user) external view returns (UserInfo memory);
+    function batchUpdateRewardPerBlock(address[] calldata _poolAddresses, uint256[] calldata _rewardAmountsPerBlock)
+        external;
 }

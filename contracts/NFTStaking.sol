@@ -67,6 +67,26 @@ contract NftStaking is
         emit RewardPerBlockUpdated(_poolAddress, _rewardAmountPerBlock);
     }
 
+    function batchUpdateRewardPerBlock(address[] calldata _poolAddresses, uint256[] calldata _rewardAmountsPerBlock)
+        external
+        onlyOwner
+    {
+        if (_poolAddresses.length != _rewardAmountsPerBlock.length) {
+            revert UnmatchedPoolLength();
+        }
+
+        for (uint256 i = 0; i < _poolAddresses.length; i++) {
+            address _poolAddress = _poolAddresses[i];
+            uint256 _rewardAmountPerBlock = _rewardAmountsPerBlock[i];
+
+            if (_poolAddress == address(0)) revert ZeroPoolAddress();
+            if (!_poolInfo[_poolAddress].exist) revert PoolDoesNotExist();
+
+            _poolInfo[_poolAddress].rewardPerBlock = _rewardAmountPerBlock;
+            emit RewardPerBlockUpdated(_poolAddress, _rewardAmountPerBlock);
+        }
+    }
+
     function deposit(address _pool, uint256 _tokenId) external whenNotPaused {
         if (!_poolInfo[_pool].exist) revert PoolDoesNotExist();
         address depositor = msg.sender;
@@ -149,6 +169,14 @@ contract NftStaking is
         } else {
             isWithdrawable = true;
         }
+    }
+
+    function getAccumulatedReward(address _user, address _nft) external view returns (uint256 accumulatedReward) {
+        UserInfo memory _userData = _userInfo[_nft][_user];
+        if (_userData.depositedAt == 0) {
+            return 0;
+        }
+        accumulatedReward = _calculateRewardAccumulated(_userData.depositedAt, _userData.rewardPerBlock);
     }
 
     function _calculateRewardAccumulated(uint256 _depositedAt, uint256 _perBlockReward)
